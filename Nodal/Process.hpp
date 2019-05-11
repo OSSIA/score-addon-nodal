@@ -37,6 +37,8 @@ public:
   void sizeChanged(QSizeF p) W_SIGNAL(sizeChanged, p);
   void processChanged(Process::ProcessModel* p) W_SIGNAL(processChanged, p);
 
+  PROPERTY(QPointF, position READ position WRITE setPosition NOTIFY positionChanged)
+  PROPERTY(QSizeF, size READ size WRITE setSize NOTIFY sizeChanged)
 private:
   std::unique_ptr<Process::ProcessModel> m_impl;
   QPointF m_position{};

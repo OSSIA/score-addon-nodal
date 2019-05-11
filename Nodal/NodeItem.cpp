@@ -1,5 +1,6 @@
 #include <Nodal/NodeItem.hpp>
 #include <Nodal/Process.hpp>
+#include <Process/Style/ScenarioStyle.hpp>
 #include <Process/ProcessFactory.hpp>
 #include <Process/ProcessList.hpp>
 #include <score/application/GUIApplicationContext.hpp>
@@ -9,6 +10,8 @@
 #include <score/document/DocumentContext.hpp>
 #include <Process/Dataflow/PortFactory.hpp>
 #include <Process/Dataflow/PortItem.hpp>
+#include <Nodal/Commands.hpp>
+
 namespace Nodal
 {
 
@@ -26,7 +29,7 @@ void NodeItem::resetInlets(
       continue;
     Process::PortFactory* fact = portFactory.get(port->concreteKey());
     Dataflow::PortItem* item = fact->makeItem(*port, m_context, this, this);
-    item->setPos(x, -5.);
+    item->setPos(x, -1.5);
     m_inlets.push_back(item);
 
     x += 10.;
@@ -47,7 +50,7 @@ void NodeItem::resetOutlets(
       continue;
     Process::PortFactory* fact = portFactory.get(port->concreteKey());
     auto item = fact->makeItem(*port, m_context, this, this);
-    item->setPos(x, boundingRect().height() - 5.);
+    item->setPos(x, boundingRect().height() + 1.5);
     m_outlets.push_back(item);
 
     x += 10.;
@@ -59,6 +62,8 @@ NodeItem::NodeItem(const Node& model, const score::DocumentContext& ctx, QGraphi
   , m_model{model}
   , m_context{ctx}
 {
+    setAcceptedMouseButtons(Qt::LeftButton);
+    setAcceptHoverEvents(true);
   auto& fact = ctx.app.interfaces<Process::LayerFactoryList>();
   if (auto factory = fact.findDefaultFactory(model.process()))
   {
@@ -72,6 +77,12 @@ NodeItem::NodeItem(const Node& model, const score::DocumentContext& ctx, QGraphi
 
   resetInlets(model.process());
   resetOutlets(model.process());
+
+  m_fx->setPos(0, 10);
+  ::bind(model, Node::p_position{}, this, [this] (QPointF p) {
+      if(p != pos())
+          setPos(p);
+  });
 
 }
 
@@ -88,12 +99,15 @@ NodeItem::~NodeItem()
 QRectF NodeItem::boundingRect() const
 {
   const auto sz = m_fx->boundingRect();
-  return {0, 0, sz.width(), sz.height()};
+  return {0, 0, sz.width(), 10 + sz.height()};
 }
 
 void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
-  painter->drawRoundedRect(boundingRect(), 2., 2.);
+    auto& style = Process::Style::instance();
+    painter->setPen(m_hover ? QPen(Qt::red) : style.RectPen);
+    painter->setBrush(style.RectBrush);
+    painter->drawRoundedRect(boundingRect(), 2., 2.);
 }
 
 void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
@@ -103,11 +117,32 @@ void NodeItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
 void NodeItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
 {
+  auto origp = mapToItem(parentItem(), event->buttonDownPos(Qt::LeftButton));
+  auto p = mapToItem(parentItem(), event->pos());
+  m_context.dispatcher.submit<MoveNode>(m_model, m_model.position() + (p - origp));
   event->accept();
 }
 
 void NodeItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
+  auto origp = mapToItem(parentItem(), event->buttonDownPos(Qt::LeftButton));
+  auto p = mapToItem(parentItem(), event->pos());
+  m_context.dispatcher.submit<MoveNode>(m_model, m_model.position() + (p - origp));
+  m_context.dispatcher.commit();
   event->accept();
+}
+
+void NodeItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
+{
+    m_hover = true;
+    update();
+    event->accept();
+}
+
+void NodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
+{
+    m_hover = false;
+    update();
+    event->accept();
 }
 }

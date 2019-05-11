@@ -1,6 +1,9 @@
 #pragma once
 #include <QGraphicsItem>
-
+namespace score
+{
+struct DocumentContext;
+}
 namespace Dataflow {
 class PortItem;
 }
@@ -29,6 +32,9 @@ private:
   void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
   void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
+  void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
+  void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
+
   void resetInlets(Process::ProcessModel& effect);
   void resetOutlets(Process::ProcessModel& effect);
 
@@ -37,5 +43,7 @@ private:
 
   std::vector<Dataflow::PortItem*> m_inlets, m_outlets;
   const score::DocumentContext& m_context;
+
+  bool m_hover{false};
 };
 }

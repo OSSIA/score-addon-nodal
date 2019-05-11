@@ -2,7 +2,7 @@
 #include <Process/Execution/ProcessComponent.hpp>
 
 #include <ossia/dataflow/node_process.hpp>
-
+#include <ossia/detail/hash_map.hpp>
 namespace Nodal
 {
 class Model;
@@ -15,6 +15,13 @@ public:
   ProcessExecutorComponent(
       Model& element, const Execution::Context& ctx,
       const Id<score::Component>& id, QObject* parent);
+
+  struct RegisteredNode
+  {
+    std::shared_ptr<Execution::ProcessComponent> comp;
+  };
+
+  ossia::fast_hash_map<Id<Process::ProcessModel>, RegisteredNode> m_nodes;
 };
 
 using ProcessExecutorComponentFactory

@@ -3,10 +3,9 @@
 #include <Nodal/Presenter.hpp>
 #include <Nodal/Process.hpp>
 #include <Nodal/View.hpp>
-#include <score/tools/IdentifierGeneration.hpp>
-#include <score/model/path/PathSerialization.hpp>
-#include <Process/ProcessMimeSerialization.hpp>
+#include <Nodal/Commands.hpp>
 
+#include <Process/ProcessMimeSerialization.hpp>
 // TODO use me
 template<typename Entities, typename Presenter>
 void bind(const Entities& model, Presenter& presenter)
@@ -22,112 +21,6 @@ namespace Nodal
 {
 
 
-
-class CreateNode final : public score::Command
-{
-  SCORE_COMMAND_DECL(
-      CommandFactoryName(),
-      CreateNode,
-      "Create a node")
-public:
-  CreateNode(
-      const Nodal::Model& process,
-      QPointF position,
-      const UuidKey<Process::ProcessModel>& uuid,
-      const QString& dat);
-
-  void undo(const score::DocumentContext& ctx) const override;
-  void redo(const score::DocumentContext& ctx) const override;
-
-protected:
-  void serializeImpl(DataStreamInput&) const override;
-  void deserializeImpl(DataStreamOutput&) override;
-
-private:
-  Path<Nodal::Model> m_path;
-  QPointF m_pos;
-  UuidKey<Process::ProcessModel> m_uuid;
-  QString m_data;
-
-  Id<Nodal::Node> m_createdNodeId;
-};
-
-
-CreateNode::CreateNode(
-    const Nodal::Model& nodal,
-    QPointF position,
-    const UuidKey<Process::ProcessModel>& process,
-    const QString& dat)
-    : m_path{nodal}
-    , m_pos{position}
-    , m_uuid{process}
-    , m_data{dat}
-    , m_createdNodeId{getStrongId(nodal.nodes)}
-{
-}
-
-void CreateNode::undo(const score::DocumentContext& ctx) const
-{
-  auto& nodal = m_path.find(ctx);
-  nodal.nodes.remove(m_createdNodeId);
-}
-
-void CreateNode::redo(const score::DocumentContext& ctx) const
-{
-  auto& nodal = m_path.find(ctx);
-  auto fac
-      = ctx.app.interfaces<Process::ProcessFactoryList>().get(m_uuid);
-  SCORE_ASSERT(fac);
-  auto proc = std::unique_ptr<Process::ProcessModel>{fac->make(
-        TimeVal{},
-        m_data,
-        Id<Process::ProcessModel>{},
-        nullptr)};
-
-  SCORE_ASSERT(proc);
-  // todo handle these asserts
-  auto node = new Node{std::move(proc), m_createdNodeId, &nodal};
-  node->setSize({100, 100});
-  node->setPosition(m_pos);
-  nodal.nodes.add(node);
-}
-
-void CreateNode::serializeImpl(DataStreamInput& s) const
-{
-  s << m_path << m_pos << m_uuid << m_data << m_createdNodeId;
-}
-
-void CreateNode::deserializeImpl(DataStreamOutput& s)
-{
-  s >> m_path >> m_pos >> m_uuid >> m_data >> m_createdNodeId;
-}
-
-/*
-class RemoveNode final : public score::Command
-{
-  SCORE_COMMAND_DECL(
-      ScenarioCommandFactoryName(),
-      RemoveNode,
-      "Remove a comment block")
-public:
-  RemoveNode(
-      const Scenario::ProcessModel& sc,
-      const Scenario::NodeModel& cb
-      );
-
-  void undo(const score::DocumentContext& ctx) const override;
-  void redo(const score::DocumentContext& ctx) const override;
-
-protected:
-  void serializeImpl(DataStreamInput&) const override;
-  void deserializeImpl(DataStreamOutput&) override;
-
-private:
-  Path<ProcessModel> m_path;
-  Id<NodeModel> m_id;
-  QByteArray m_block;
-};
-*/
 Presenter::Presenter(
     const Model& layer, View* view,
     const Process::ProcessPresenterContext& ctx, QObject* parent)

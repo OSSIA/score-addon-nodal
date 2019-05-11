@@ -14,6 +14,7 @@ set(HDRS
     Nodal/View.hpp
     Nodal/Layer.hpp
     Nodal/CommandFactory.hpp
+    Nodal/Commands.hpp
     Nodal/NodeItem.hpp
 
     score_addon_nodal.hpp
@@ -25,6 +26,7 @@ set(SRCS
     Nodal/Presenter.cpp
     Nodal/Process.cpp
     Nodal/View.cpp
+    Nodal/Commands.cpp
     Nodal/NodeItem.cpp
 
     score_addon_nodal.cpp
@@ -38,7 +40,7 @@ add_library(${PROJECT_NAME} ${SRCS} ${HDRS})
 score_generate_command_list_file(${PROJECT_NAME} "${HDRS}")
 
 # Link
-target_link_libraries(${PROJECT_NAME} PUBLIC score_plugin_scenario)
+target_link_libraries(${PROJECT_NAME} PUBLIC score_plugin_scenario score_plugin_engine)
 
 # Target-specific options
 setup_score_plugin(${PROJECT_NAME})
