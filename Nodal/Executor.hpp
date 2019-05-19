@@ -22,6 +22,11 @@ public:
   };
 
   ossia::fast_hash_map<Id<Process::ProcessModel>, RegisteredNode> m_nodes;
+
+private:
+  void reg(const RegisteredNode& fx,
+           std::vector<Execution::ExecutionCommand>& vec);
+  void unreg(const RegisteredNode& fx);
 };
 
 using ProcessExecutorComponentFactory

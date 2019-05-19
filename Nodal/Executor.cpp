@@ -1,6 +1,7 @@
 #include "Executor.hpp"
 
 #include <Process/ExecutionContext.hpp>
+#include <Process/ExecutionSetup.hpp>
 
 #include <ossia/dataflow/port.hpp>
 #include <ossia/dataflow/node_chain_process.hpp>
@@ -86,6 +87,7 @@ ProcessExecutorComponent::ProcessExecutorComponent(
   auto p = std::make_shared<ossia::node_graph_process>();
   m_ossia_process = p;
 
+  std::vector<Execution::ExecutionCommand> commands;
   auto& fact = ctx.doc.app.interfaces<Execution::ProcessComponentFactoryList>();
 
   for(Node& node : element.nodes)
@@ -96,14 +98,35 @@ ProcessExecutorComponent::ProcessExecutorComponent(
       auto comp = f->make(proc, ctx, Id<score::Component>{proc.id_val()}, this);
       if(comp)
       {
-        m_nodes[proc.id()] = {comp};
+
+        reg(m_nodes[proc.id()] = {comp}, commands);
         if(auto n = comp->node)
         {
           p->add_node(n);
         }
       }
     }
-
   }
+
+  in_exec([f = std::move(commands)] {
+    for (auto& cmd : f)
+      cmd();
+  });
 }
+
+void ProcessExecutorComponent::unreg(
+    const RegisteredNode& fx)
+{
+  system().setup.unregister_node_soft(
+      fx.comp->process().inlets(), fx.comp->process().outlets(), fx.comp->node);
+}
+
+void ProcessExecutorComponent::reg(
+    const RegisteredNode& fx,
+    std::vector<Execution::ExecutionCommand>& vec)
+{
+  system().setup.register_node(
+              fx.comp->process().inlets(), fx.comp->process().outlets(), fx.comp->node, vec);
+}
+
 }

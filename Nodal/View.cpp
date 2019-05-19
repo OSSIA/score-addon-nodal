@@ -9,6 +9,7 @@ namespace Nodal
 
 View::View(QGraphicsItem* parent) : LayerView{parent}
 {
+    setFlag(ItemHasNoContents, true);
 }
 
 View::~View()
@@ -17,7 +18,6 @@ View::~View()
 
 void View::paint_impl(QPainter* painter) const
 {
-  painter->drawText(boundingRect(), "Change me");
 }
 
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <Nodal/CommandFactory.hpp>
 #include <Nodal/Process.hpp>
+#include <score/command/AggregateCommand.hpp>
 #include <score/command/PropertyCommand.hpp>
 
 PROPERTY_COMMAND_T(
@@ -8,11 +9,20 @@ PROPERTY_COMMAND_T(
     MoveNode,
     Node::p_position,
     "Move node")
-
+SCORE_COMMAND_DECL_T(Nodal::MoveNode)
 namespace Nodal
 {
 class Model;
 class Node;
+
+class DropNodesMacro final : public score::AggregateCommand
+{
+  SCORE_COMMAND_DECL(
+      CommandFactoryName(),
+      DropNodesMacro,
+      "Drop nodes")
+};
+
 class CreateNode final : public score::Command
 {
   SCORE_COMMAND_DECL(
@@ -29,6 +39,7 @@ public:
   void undo(const score::DocumentContext& ctx) const override;
   void redo(const score::DocumentContext& ctx) const override;
 
+  const Id<Nodal::Node>& nodeId() const noexcept { return m_createdNodeId; }
 protected:
   void serializeImpl(DataStreamInput&) const override;
   void deserializeImpl(DataStreamOutput&) override;

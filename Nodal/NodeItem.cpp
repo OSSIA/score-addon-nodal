@@ -62,18 +62,29 @@ NodeItem::NodeItem(const Node& model, const score::DocumentContext& ctx, QGraphi
   , m_model{model}
   , m_context{ctx}
 {
-    setAcceptedMouseButtons(Qt::LeftButton);
-    setAcceptHoverEvents(true);
+  setAcceptedMouseButtons(Qt::LeftButton);
+  setAcceptHoverEvents(true);
+
   auto& fact = ctx.app.interfaces<Process::LayerFactoryList>();
   if (auto factory = fact.findDefaultFactory(model.process()))
   {
-    m_fx = factory->makeItem(model.process(), ctx, this);
+    auto fx = factory->makeItem(model.process(), ctx, this);
+    if(fx)
+    {
+        m_fx = fx;
+        connect(fx, &score::ResizeableItem::sizeChanged,
+                this, [this] {
+           prepareGeometryChange();
+           update();
+        });
+    }
   }
 
   if (!m_fx)
   {
     m_fx = new Media::Effect::DefaultEffectItem{model.process(), ctx, this};
   }
+
 
   resetInlets(model.process());
   resetOutlets(model.process());

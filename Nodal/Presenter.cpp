@@ -4,8 +4,10 @@
 #include <Nodal/Process.hpp>
 #include <Nodal/View.hpp>
 #include <Nodal/Commands.hpp>
-
+#include <Process/Drop/ProcessDropHandler.hpp>
+#include <score/command/Dispatchers/MacroCommandDispatcher.hpp>
 #include <Process/ProcessMimeSerialization.hpp>
+
 // TODO use me
 template<typename Entities, typename Presenter>
 void bind(const Entities& model, Presenter& presenter)
@@ -39,6 +41,33 @@ Presenter::Presenter(
       auto cmd = new CreateNode(layer, pos, p.key, p.customData);
       CommandDispatcher<> d{ctx.commandStack};
       d.submit(cmd);
+    }
+    else
+    {
+      // TODO refactor with EffectProcessLayer
+      const auto& handlers = ctx.app.interfaces<Process::ProcessDropHandlerList>();
+
+      if (auto res = handlers.getDrop(mime, ctx); !res.empty())
+      {
+        MacroCommandDispatcher<DropNodesMacro> cmd{ctx.commandStack};
+        score::Dispatcher_T disp{cmd};
+        for (const auto& proc : res)
+        {
+          auto& p = proc.creation;
+          // TODO fudge pos a bit
+          auto create = new CreateNode(layer, pos, p.key, p.customData);
+          cmd.submit(create);
+          if (auto fx = layer.nodes.find(create->nodeId()); fx != layer.nodes.end())
+          {
+            if (proc.setup)
+            {
+              proc.setup((*fx).process(), disp);
+            }
+          }
+        }
+
+        cmd.commit();
+      }
     }
   });
 

@@ -70,13 +70,13 @@ QString Model::prettyName() const noexcept
 template <>
 void DataStreamReader::read(const Nodal::Model& proc)
 {
-  insertDelimiter();
+    insertDelimiter();
 }
 
 template <>
 void DataStreamWriter::write(Nodal::Model& proc)
 {
-  checkDelimiter();
+    checkDelimiter();
 }
 
 template <>
