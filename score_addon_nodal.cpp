@@ -39,7 +39,7 @@ score_addon_nodal::make_commands()
 {
   using namespace Nodal;
   std::pair<const CommandGroupKey, CommandGeneratorMap> cmds{
-      CommandFactoryName(), CommandGeneratorMap{}};
+      Nodal::CommandFactoryName(), CommandGeneratorMap{}};
 
   ossia::for_each_type<
 #include <score_addon_nodal_commands.hpp>
