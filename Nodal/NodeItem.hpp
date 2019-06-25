@@ -1,5 +1,6 @@
 #pragma once
 #include <QGraphicsItem>
+#include <score/model/Identifier.hpp>
 namespace score
 {
 struct DocumentContext;
@@ -14,6 +15,7 @@ class ProcessModel;
 
 namespace Nodal
 {
+class TitleItem;
 class Node;
 class NodeItem
     : public QObject
@@ -39,6 +41,7 @@ private:
   void resetOutlets(Process::ProcessModel& effect);
 
   const Node& m_model;
+  TitleItem* m_title{};
   QGraphicsItem* m_fx{};
 
   std::vector<Dataflow::PortItem*> m_inlets, m_outlets;

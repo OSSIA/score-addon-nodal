@@ -9,11 +9,80 @@
 #include <Control/DefaultEffectItem.hpp>
 #include <score/document/DocumentContext.hpp>
 #include <Process/Dataflow/PortFactory.hpp>
+#include <Effect/EffectLayer.hpp>
 #include <Process/Dataflow/PortItem.hpp>
 #include <Nodal/Commands.hpp>
-
+#include <score/selection/SelectionDispatcher.hpp>
+#include <score/graphics/TextItem.hpp>
+#include <wobjectimpl.h>
 namespace Nodal
 {
+
+class TitleItem final
+    : public QObject
+    , public QGraphicsItem
+{
+  W_OBJECT(TitleItem)
+public:
+  TitleItem(
+      Process::ProcessModel& effect,
+      const score::DocumentContext& ctx,
+      NodeItem& item,
+      QObject* parent)
+  : QObject{parent}
+  , m_effect{effect}
+  , m_width{170}
+  , m_item{item}
+  {
+    const auto& skin = Process::Style::instance();
+
+    if (auto ui_btn
+        = Process::makeExternalUIButton(effect, ctx, this, this))
+      ui_btn->setPos({5, 0});
+
+    auto label = new score::SimpleTextItem{skin.IntervalBase, this};
+    label->setText(effect.prettyShortName());
+    label->setFont(skin.skin.Medium10Pt);
+    label->setPos({30, 0});
+  }
+
+  QRectF boundingRect() const override { return {0, 0, m_width, 15}; }
+  void paint(
+      QPainter* painter,
+      const QStyleOptionGraphicsItem* option,
+      QWidget* widget) override
+  {
+    static const auto pen = QPen{Qt::transparent};
+    auto& style = Process::Style::instance();
+
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(pen);
+    painter->setBrush(m_hover ? QBrush(style.RectPen.color().lighter(110)) : style.RectPen.brush());
+    painter->drawRoundedRect(boundingRect(), 2, 2);
+    painter->setRenderHint(QPainter::Antialiasing, false);
+  }
+
+  void setWidth(qreal w) {
+    prepareGeometryChange();
+    m_width = w;
+  }
+  void setHighlight(bool b) {}
+  void clicked() W_SIGNAL(clicked)
+
+
+  void setHover(bool b)
+  {
+    m_hover = b;
+    update();
+  }
+
+private:
+  const Process::ProcessModel& m_effect;
+  NodeItem& m_item;
+  qreal m_width{};
+  bool m_hover{};
+};
+
 
 void NodeItem::resetInlets(
     Process::ProcessModel& effect)
@@ -65,6 +134,17 @@ NodeItem::NodeItem(const Node& model, const score::DocumentContext& ctx, QGraphi
   setAcceptedMouseButtons(Qt::LeftButton);
   setAcceptHoverEvents(true);
 
+  // Title
+  m_title = new TitleItem{model.process(), ctx, *this, this};
+  m_title->setParentItem(this);
+
+  //
+  //connect(this, &TitleItem::clicked, this, [&] {
+  //  doc.focusDispatcher.focus(&ctx.presenter);
+  //  score::SelectionDispatcher{doc.selectionStack}.setAndCommit({&effect});
+  //});
+  //
+  // Body
   auto& fact = ctx.app.interfaces<Process::LayerFactoryList>();
   if (auto factory = fact.findDefaultFactory(model.process()))
   {
@@ -75,6 +155,7 @@ NodeItem::NodeItem(const Node& model, const score::DocumentContext& ctx, QGraphi
         connect(fx, &score::ResizeableItem::sizeChanged,
                 this, [this] {
            prepareGeometryChange();
+           m_title->setWidth(m_fx->boundingRect().width());
            update();
         });
     }
@@ -85,11 +166,11 @@ NodeItem::NodeItem(const Node& model, const score::DocumentContext& ctx, QGraphi
     m_fx = new Media::Effect::DefaultEffectItem{model.process(), ctx, this};
   }
 
-
   resetInlets(model.process());
   resetOutlets(model.process());
 
-  m_fx->setPos(0, 10);
+  m_fx->setPos({0, m_title->boundingRect().height()});
+
   ::bind(model, Node::p_position{}, this, [this] (QPointF p) {
       if(p != pos())
           setPos(p);
@@ -110,13 +191,14 @@ NodeItem::~NodeItem()
 QRectF NodeItem::boundingRect() const
 {
   const auto sz = m_fx->boundingRect();
-  return {0, 0, sz.width(), 10 + sz.height()};
+  const auto tsz = m_title->boundingRect();
+  return {0, 0, sz.width(), tsz.height() + sz.height()};
 }
 
 void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
     auto& style = Process::Style::instance();
-    painter->setPen(m_hover ? QPen(Qt::red) : style.RectPen);
+    painter->setPen(m_hover ? QPen(style.RectPen.color().lighter(110)) : style.RectPen);
     painter->setBrush(style.RectBrush);
     painter->drawRoundedRect(boundingRect(), 2., 2.);
 }
@@ -146,6 +228,7 @@ void NodeItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 void NodeItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
 {
     m_hover = true;
+    m_title->setHover(true);
     update();
     event->accept();
 }
@@ -153,7 +236,9 @@ void NodeItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
 void NodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 {
     m_hover = false;
+    m_title->setHover(false);
     update();
     event->accept();
 }
 }
+W_OBJECT_IMPL(Nodal::TitleItem)
