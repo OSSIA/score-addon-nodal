@@ -33,7 +33,7 @@ void CreateNode::redo(const score::DocumentContext& ctx) const
       = ctx.app.interfaces<Process::ProcessFactoryList>().get(m_uuid);
   SCORE_ASSERT(fac);
   auto proc = std::unique_ptr<Process::ProcessModel>{fac->make(
-        TimeVal{},
+        nodal.duration(),
         m_data,
         Id<Process::ProcessModel>{},
         nullptr)};

@@ -7,7 +7,9 @@
 #include <Process/Drop/ProcessDropHandler.hpp>
 #include <score/command/Dispatchers/MacroCommandDispatcher.hpp>
 #include <Process/ProcessMimeSerialization.hpp>
-
+#include <QTimer>
+#include <Scenario/Document/Interval/IntervalModel.hpp>
+#include <ossia/detail/math.hpp>
 // TODO use me
 template<typename Entities, typename Presenter>
 void bind(const Entities& model, Presenter& presenter)
@@ -71,14 +73,38 @@ Presenter::Presenter(
     }
   });
 
+
+  m_con = con(ctx.execTimer, &QTimer::timeout,
+              this, [&] {
+    auto parentObj = m_model.parent();
+    while(parentObj && !qobject_cast<Scenario::IntervalModel*>(parentObj)){
+      parentObj = parentObj->parent();
+    }
+
+    if(parentObj)
+    {
+      auto itv = static_cast<Scenario::IntervalModel*>(parentObj);
+      float p = ossia::clamp((float)itv->duration.playPercentage(), 0.f, 1.f);
+      for(auto& node : m_nodes)
+      {
+        node.setPlayPercentage(p);
+      }
+    }
+  });
 }
 Presenter::~Presenter()
 {
   m_nodes.remove_all();
 }
-void Presenter::setWidth(qreal val)
+void Presenter::setWidth(qreal val, qreal defaultWidth)
 {
   m_view->setWidth(val);
+  m_defaultW = defaultWidth;
+  const auto r = m_ratio * m_defaultW;
+  for(NodeItem& node : m_nodes)
+  {
+    node.setZoomRatio(r);
+  }
 }
 
 void Presenter::setHeight(qreal val)
@@ -96,8 +122,14 @@ void Presenter::putBehind()
   m_view->setOpacity(0.2);
 }
 
-void Presenter::on_zoomRatioChanged(ZoomRatio)
+void Presenter::on_zoomRatioChanged(ZoomRatio r)
 {
+  m_ratio = r;
+  for(NodeItem& node : m_nodes)
+  {
+    const qreal size_r = m_defaultW / node.width();
+    node.setZoomRatio(r * size_r);
+  }
 }
 
 void Presenter::parentGeometryChanged()
@@ -116,8 +148,10 @@ const Id<Process::ProcessModel>& Presenter::modelId() const
 
 void Presenter::on_created(const Node& n)
 {
-  auto item = new NodeItem{n, m_context.context, m_view};
+  auto item = new NodeItem{n, m_context, m_view};
   item->setPos(n.position());
+  const qreal size_r = m_defaultW / item->width();
+  item->setZoomRatio(this->m_ratio * size_r);
   m_nodes.insert(item);
 }
 

@@ -66,6 +66,23 @@ QString Model::prettyName() const noexcept
   return tr("Nodal Process");
 }
 
+void Model::setDurationAndScale(const TimeVal& newDuration) noexcept
+{
+  for(Node& n : this->nodes)
+    n.process().setParentDuration(ExpandMode::Scale, newDuration);
+}
+
+void Model::setDurationAndGrow(const TimeVal& newDuration) noexcept
+{
+  for(Node& n : this->nodes)
+    n.process().setParentDuration(ExpandMode::GrowShrink, newDuration);
+}
+
+void Model::setDurationAndShrink(const TimeVal& newDuration) noexcept
+{
+  for(Node& n : this->nodes)
+    n.process().setParentDuration(ExpandMode::GrowShrink, newDuration);
+}
 }
 template <>
 void DataStreamReader::read(const Nodal::Model& proc)

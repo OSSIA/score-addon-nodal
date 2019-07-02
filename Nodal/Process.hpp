@@ -67,6 +67,10 @@ public:
   score::EntityMap<Node> nodes;
 private:
   QString prettyName() const noexcept override;
+
+  void setDurationAndScale(const TimeVal& newDuration) noexcept override;
+  void setDurationAndGrow(const TimeVal& newDuration) noexcept override;
+  void setDurationAndShrink(const TimeVal& newDuration) noexcept override;
 };
 
 using ProcessFactory = Process::ProcessFactory_T<Nodal::Model>;

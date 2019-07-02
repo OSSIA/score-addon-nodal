@@ -10,6 +10,12 @@ PROPERTY_COMMAND_T(
     Node::p_position,
     "Move node")
 SCORE_COMMAND_DECL_T(Nodal::MoveNode)
+PROPERTY_COMMAND_T(
+    Nodal,
+    ResizeNode,
+    Node::p_size,
+    "Resize node")
+SCORE_COMMAND_DECL_T(Nodal::ResizeNode)
 namespace Nodal
 {
 class Model;

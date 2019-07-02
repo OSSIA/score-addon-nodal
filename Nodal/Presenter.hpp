@@ -24,7 +24,7 @@ public:
       const Process::ProcessPresenterContext& ctx, QObject* parent);
   ~Presenter();
 
-  void setWidth(qreal width) override;
+  void setWidth(qreal width, qreal defaultWidth) override;
   void setHeight(qreal height) override;
 
   void putToFront() override;
@@ -44,6 +44,9 @@ private:
   IdContainer<NodeItem, Node> m_nodes;
 
   const Model& m_model;
+  qreal m_defaultW{};
+  ZoomRatio m_ratio{1.};
   View* m_view{};
+  QMetaObject::Connection m_con;
 };
 }
