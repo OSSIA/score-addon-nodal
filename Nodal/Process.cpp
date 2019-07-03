@@ -2,6 +2,8 @@
 
 #include <wobjectimpl.h>
 
+#include <Process/ProcessList.hpp>
+
 W_OBJECT_IMPL(Nodal::Node)
 W_OBJECT_IMPL(Nodal::Model)
 namespace Nodal
@@ -85,23 +87,98 @@ void Model::setDurationAndShrink(const TimeVal& newDuration) noexcept
 }
 }
 template <>
-void DataStreamReader::read(const Nodal::Model& proc)
+void DataStreamReader::read(const Nodal::Node& proc)
 {
-    insertDelimiter();
+  m_stream << *proc.m_impl
+           << proc.m_position
+           << proc.m_size;
+  insertDelimiter();
 }
 
 template <>
-void DataStreamWriter::write(Nodal::Model& proc)
+void DataStreamWriter::write(Nodal::Node& node)
 {
-    checkDelimiter();
+  static auto& pl = components.interfaces<Process::ProcessFactoryList>();
+  auto proc = deserialize_interface(pl, *this, &node);
+  if (proc)
+  {
+    // TODO why isn't AddProcess used here ?!
+    node.m_impl.reset(proc);
+  }
+  else
+  {
+    SCORE_TODO;
+  }
+  m_stream >> node.m_position >> node.m_size;
+
+  checkDelimiter();
+}
+
+template <>
+void JSONObjectReader::read(const Nodal::Node& proc)
+{
+  obj["Process"] = toJsonObject(*proc.m_impl);
+  obj["Pos"] = toJsonValue(proc.m_position);
+  obj["Size"] = toJsonValue(proc.m_size);
+}
+
+template <>
+void JSONObjectWriter::write(Nodal::Node& node)
+{
+  static auto& pl = components.interfaces<Process::ProcessFactoryList>();
+
+  {
+    const auto& json_vref = obj["Process"];
+    JSONObject::Deserializer deserializer{json_vref.toObject()};
+    auto proc = deserialize_interface(pl, deserializer, &node);
+    if (proc)
+      node.m_impl.reset(proc);
+    else
+      SCORE_TODO;
+  }
+   node.m_position = fromJsonValue<QPointF>(obj["Pos"]);
+   node.m_size = fromJsonValue<QSizeF>(obj["Size"]);
+}
+
+template <>
+void DataStreamReader::read(const Nodal::Model& proc)
+{
+  m_stream << (int32_t) proc.nodes.size();
+  for(const auto& node : proc.nodes)
+    readFrom(node);
+
+  insertDelimiter();
+}
+
+template <>
+void DataStreamWriter::write(Nodal::Model& process)
+{
+  int32_t process_count = 0;
+  m_stream >> process_count;
+  for (; process_count-- > 0;)
+  {
+    auto node = new Nodal::Node{*this, &process};
+    process.nodes.add(node);
+  }
+  checkDelimiter();
 }
 
 template <>
 void JSONObjectReader::read(const Nodal::Model& proc)
 {
+  obj["Nodes"] = toJsonArray(proc.nodes);
 }
 
 template <>
 void JSONObjectWriter::write(Nodal::Model& proc)
 {
+  const auto& nodes = obj["Nodes"].toArray();
+  for (const auto& json_vref : nodes)
+  {
+    auto node = new Nodal::Node{
+        JSONObject::Deserializer{json_vref.toObject()}, &proc};
+
+    proc.nodes.add(node);
+  }
+
 }

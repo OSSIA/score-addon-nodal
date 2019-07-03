@@ -13,10 +13,13 @@
 #include <Process/Dataflow/PortItem.hpp>
 #include <Process/Focus/FocusDispatcher.hpp>
 #include <Nodal/Commands.hpp>
-
+#include <Nodal/Process.hpp>
 #include <score/selection/SelectionDispatcher.hpp>
 #include <score/graphics/TextItem.hpp>
+#include <score/tools/std/Invoke.hpp>
+#include <QKeyEvent>
 #include <wobjectimpl.h>
+#include <score/command/Dispatchers/CommandDispatcher.hpp>
 namespace Nodal
 {
 
@@ -149,6 +152,7 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
 {
   setAcceptedMouseButtons(Qt::LeftButton);
   setAcceptHoverEvents(true);
+  setFlag(ItemIsFocusable, true);
 
   // Title
   m_title = new TitleItem{model.process(), ctx.context, *this, this};
@@ -165,25 +169,27 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
         connect(fx, &score::ResizeableItem::sizeChanged,
                 this, [this] {
            prepareGeometryChange();
-           m_title->setWidth(m_fx->boundingRect().width());
+           const auto r = m_fx->boundingRect();
+           m_title->setWidth(r.width());
+           m_size = r.size();
            update();
         });
     }
     else if(auto fx = factory->makeLayerView(model.process(), this))
     {
+      m_fx = fx;
       m_presenter = factory->makeLayerPresenter(model.process(), fx, ctx.context, this);
       m_presenter->setWidth(300., 300.);
-      m_size = {300., 100.};
       m_presenter->setHeight(100.);
+      m_size = {300., 100.};
       m_presenter->on_zoomRatioChanged(1.);
-
-      m_fx = fx;
     }
   }
 
   if (!m_fx)
   {
     m_fx = new Media::Effect::DefaultEffectItem{model.process(), ctx.context, this};
+    m_size = m_fx->boundingRect().size();
   }
 
   resetInlets(model.process());
@@ -191,7 +197,7 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
 
   // Positions / size
   m_fx->setPos({0, m_title->boundingRect().height()});
-  m_title->setWidth(m_fx->boundingRect().width());
+  m_title->setWidth(m_size.width());
 
   ::bind(model, Node::p_position{}, this, [this] (QPointF p) {
       if(p != pos())
@@ -212,11 +218,14 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
 
 void NodeItem::setSize(QSizeF sz)
 {
-  prepareGeometryChange();
-  m_size = sz;
-  m_title->setWidth(sz.width());
   if(m_presenter)
   {
+    // TODO: find a way to indicate to a model what will be the size of the item
+    //      - maybe set it without a command in that case ?
+    prepareGeometryChange();
+    m_size = sz;
+    m_title->setWidth(sz.width());
+
     m_presenter->setWidth(sz.width(), sz.width());
     m_presenter->setHeight(sz.height());
     m_presenter->on_zoomRatioChanged(m_ratio / width());
@@ -255,15 +264,17 @@ void NodeItem::setSelected(bool s)
   if(m_selected != s)
   {
     m_selected = s;
+    if(s)
+      setFocus();
+
     update();
   }
 }
 
 QRectF NodeItem::boundingRect() const
 {
-  const auto sz = m_fx->boundingRect();
   const auto tsz = m_title->boundingRect();
-  return {0, 0, sz.width(), tsz.height() + sz.height() + 10.};
+  return {0, 0, m_size.width(), tsz.height() + m_size.height() + 10.};
 }
 
 bool NodeItem::isInSelectionCorner(QPointF p, QRectF r) const
@@ -292,7 +303,18 @@ void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, 
   painter->setBrush(fillBrush);
   painter->drawRoundedRect(QRectF{0., rect.height() - 10., rect.width(), 10.}, 2., 2.);
 
-  painter->fillRect(QRectF{rect.width() - 10., rect.height() - 10., 10., 10.}, basePen.brush().color().darker());
+  if(m_presenter)
+  {
+    QBrush b = basePen.brush();
+    b.setColor(b.color().darker());
+    b.setStyle(Qt::BrushStyle::BDiagPattern);
+    painter->fillRect(QRectF{
+                        rect.width() - 10.,
+                        rect.height() - 10.,
+                        10., 10.
+                      },
+                      b);
+  }
 }
 
 namespace {
@@ -389,3 +411,28 @@ void NodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 }
 }
 W_OBJECT_IMPL(Nodal::TitleItem)
+
+
+void Nodal::NodeItem::keyPressEvent(QKeyEvent* event)
+{
+  switch(event->key())
+  {
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace:
+    {
+      auto f = [this] {
+        auto parent = static_cast<Nodal::Model*>(m_model.parent());
+        CommandDispatcher<>{m_context.context.commandStack}.submit<RemoveNode>(
+              *parent, m_model );
+      };
+      score::invoke(f);
+      break;
+    }
+  }
+  event->accept();
+}
+
+void Nodal::NodeItem::keyReleaseEvent(QKeyEvent* event)
+{
+
+}

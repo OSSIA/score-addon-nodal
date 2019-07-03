@@ -49,6 +49,9 @@ private:
   void hoverMoveEvent(QGraphicsSceneHoverEvent* event) override;
   void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
 
+  void keyPressEvent(QKeyEvent* event) override;
+  void keyReleaseEvent(QKeyEvent* event) override;
+
   void resetInlets(Process::ProcessModel& effect);
   void resetOutlets(Process::ProcessModel& effect);
 

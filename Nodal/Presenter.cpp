@@ -122,13 +122,13 @@ void Presenter::putBehind()
   m_view->setOpacity(0.2);
 }
 
-void Presenter::on_zoomRatioChanged(ZoomRatio r)
+void Presenter::on_zoomRatioChanged(ZoomRatio ratio)
 {
-  m_ratio = r;
+  m_ratio = ratio;
+  const auto r = m_ratio * m_defaultW;
   for(NodeItem& node : m_nodes)
   {
-    const qreal size_r = m_defaultW / node.width();
-    node.setZoomRatio(r * size_r);
+    node.setZoomRatio(r);
   }
 }
 
@@ -150,8 +150,8 @@ void Presenter::on_created(const Node& n)
 {
   auto item = new NodeItem{n, m_context, m_view};
   item->setPos(n.position());
-  const qreal size_r = m_defaultW / item->width();
-  item->setZoomRatio(this->m_ratio * size_r);
+  const auto r = m_ratio * m_defaultW;
+  item->setZoomRatio(r);
   m_nodes.insert(item);
 }
 

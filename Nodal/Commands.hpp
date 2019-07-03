@@ -3,6 +3,7 @@
 #include <Nodal/Process.hpp>
 #include <score/command/AggregateCommand.hpp>
 #include <score/command/PropertyCommand.hpp>
+#include <Dataflow/Commands/CableHelpers.hpp>
 
 PROPERTY_COMMAND_T(
     Nodal,
@@ -73,25 +74,40 @@ public:
       const Nodal::Model& p,
       const Nodal::Node& n
       )
+  : m_path{p}
+  , m_id{n.id()}
   {
+    // Save the node
+    DataStream::Serializer s1{&m_block};
+    s1.readFrom(n);
 
+    m_cables = Dataflow::saveCables({const_cast<Node*>(&n)}, score::IDocument::documentContext(p));
   }
 
 private:
   void undo(const score::DocumentContext& ctx) const override
   {
-    // TODO save / restore cables
+    DataStream::Deserializer s{m_block};
+    auto& proc = m_path.find(ctx);
+    auto node = new Node{s, &proc};
+    proc.nodes.add(node);
 
+    Dataflow::restoreCables(m_cables, ctx);
   }
+
   void redo(const score::DocumentContext& ctx) const override
   {
+    Dataflow::removeCables(m_cables, ctx);
 
+    auto& proc = m_path.find(ctx);
+    proc.nodes.remove(m_id);
   }
 
   void serializeImpl(DataStreamInput&) const override
   {
 
   }
+
   void deserializeImpl(DataStreamOutput&) override
   {
 
@@ -100,6 +116,7 @@ private:
   Path<Nodal::Model> m_path;
   Id<Nodal::Node> m_id;
   QByteArray m_block;
+  Dataflow::SerializedCables m_cables;
 };
 
 

@@ -10,6 +10,7 @@ class Node final
     : public score::Entity<Node>
 {
   W_OBJECT(Node)
+  SCORE_SERIALIZE_FRIENDS
 
 public:
   Node(
@@ -17,8 +18,22 @@ public:
       const Id<Node>& id,
       QObject* parent);
 
-  template <typename Impl>
-  Node(Impl& vis, QObject* parent)
+  Node(DataStreamWriter& vis, QObject* parent)
+    : score::Entity<Node>{vis, parent}
+  {
+    vis.writeTo(*this);
+  }
+  Node(DataStreamWriter&& vis, QObject* parent)
+    : score::Entity<Node>{vis, parent}
+  {
+    vis.writeTo(*this);
+  }
+  Node(JSONObjectWriter& vis, QObject* parent)
+    : score::Entity<Node>{vis, parent}
+  {
+    vis.writeTo(*this);
+  }
+  Node(JSONObjectWriter&& vis, QObject* parent)
     : score::Entity<Node>{vis, parent}
   {
     vis.writeTo(*this);
