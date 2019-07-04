@@ -55,8 +55,14 @@ Model::Model(
     const TimeVal& duration, const Id<Process::ProcessModel>& id,
     QObject* parent)
     : Process::ProcessModel{duration, id, "NodalProcess", parent}
+    , inlet{Process::make_inlet(Id<Process::Port>(0), this)}
+    , outlet{Process::make_outlet(Id<Process::Port>(0), this)}
 {
   metadata().setInstanceName(*this);
+  inlet->type = Process::PortType::Audio;
+  outlet->type = Process::PortType::Audio;
+  outlet->setPropagate(true);
+  init();
 }
 
 Model::~Model()
@@ -143,6 +149,10 @@ void JSONObjectWriter::write(Nodal::Node& node)
 template <>
 void DataStreamReader::read(const Nodal::Model& proc)
 {
+  // Ports
+  m_stream << *proc.inlet << *proc.outlet;
+
+  // Nodes
   m_stream << (int32_t) proc.nodes.size();
   for(const auto& node : proc.nodes)
     readFrom(node);
@@ -153,6 +163,11 @@ void DataStreamReader::read(const Nodal::Model& proc)
 template <>
 void DataStreamWriter::write(Nodal::Model& process)
 {
+  // Ports
+  process.inlet = Process::make_inlet(*this, &process);
+  process.outlet = Process::make_outlet(*this, &process);
+
+  // Nodes
   int32_t process_count = 0;
   m_stream >> process_count;
   for (; process_count-- > 0;)
@@ -167,11 +182,32 @@ template <>
 void JSONObjectReader::read(const Nodal::Model& proc)
 {
   obj["Nodes"] = toJsonArray(proc.nodes);
+  obj["Inlet"] = toJsonObject(*proc.inlet);
+  obj["Outlet"] = toJsonObject(*proc.outlet);
 }
 
 template <>
 void JSONObjectWriter::write(Nodal::Model& proc)
 {
+  {
+    JSONObjectWriter writer{obj["Inlet"].toObject()};
+    proc.inlet = Process::make_inlet(writer, &proc);
+    if (!proc.inlet)
+    {
+      proc.inlet = Process::make_inlet(Id<Process::Port>(0), &proc);
+      proc.inlet->type = Process::PortType::Audio;
+    }
+  }
+  {
+    JSONObjectWriter writer{obj["Outlet"].toObject()};
+    proc.outlet = Process::make_outlet(writer, &proc);
+
+    if (!proc.outlet)
+    {
+      proc.outlet = Process::make_outlet(Id<Process::Port>(0), &proc);
+      proc.outlet->type = Process::PortType::Audio;
+    }
+  }
   const auto& nodes = obj["Nodes"].toArray();
   for (const auto& json_vref : nodes)
   {

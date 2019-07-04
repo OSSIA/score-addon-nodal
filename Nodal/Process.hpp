@@ -1,5 +1,6 @@
 #pragma once
 #include <Process/GenericProcessFactory.hpp>
+#include <Process/Dataflow/Port.hpp>
 #include <Process/Process.hpp>
 
 #include <Nodal/Metadata.hpp>
@@ -67,6 +68,9 @@ class Model final : public Process::ProcessModel
   W_OBJECT(Model)
 
 public:
+  std::unique_ptr<Process::Inlet> inlet;
+  std::unique_ptr<Process::Outlet> outlet;
+
   Model(
       const TimeVal& duration, const Id<Process::ProcessModel>& id,
       QObject* parent);
@@ -75,6 +79,13 @@ public:
   Model(Impl& vis, QObject* parent) : Process::ProcessModel{vis, parent}
   {
     vis.writeTo(*this);
+    init();
+  }
+
+  void init()
+  {
+    m_inlets.push_back(inlet.get());
+    m_outlets.push_back(outlet.get());
   }
 
   ~Model() override;

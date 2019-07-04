@@ -98,8 +98,7 @@ ProcessExecutorComponent::ProcessExecutorComponent(
       auto comp = f->make(proc, ctx, Id<score::Component>{proc.id_val()}, this);
       if(comp)
       {
-
-        reg(m_nodes[proc.id()] = {comp}, commands);
+        reg(m_nodes[node.id()] = {comp}, commands);
         if(auto n = comp->node)
         {
           p->add_node(n);

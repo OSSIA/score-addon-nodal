@@ -6,6 +6,7 @@
 namespace Nodal
 {
 class Model;
+class Node;
 class ProcessExecutorComponent final
     : public Execution::ProcessComponent_T<
           Nodal::Model, ossia::node_process>
@@ -21,7 +22,7 @@ public:
     std::shared_ptr<Execution::ProcessComponent> comp;
   };
 
-  ossia::fast_hash_map<Id<Process::ProcessModel>, RegisteredNode> m_nodes;
+  ossia::fast_hash_map<Id<Nodal::Node>, RegisteredNode> m_nodes;
 
 private:
   void reg(const RegisteredNode& fx,

@@ -103,14 +103,14 @@ private:
     proc.nodes.remove(m_id);
   }
 
-  void serializeImpl(DataStreamInput&) const override
+  void serializeImpl(DataStreamInput& s) const override
   {
-
+    s << m_path << m_id << m_block << m_cables;
   }
 
-  void deserializeImpl(DataStreamOutput&) override
+  void deserializeImpl(DataStreamOutput& s) override
   {
-
+    s >> m_path >> m_id >> m_block >> m_cables;
   }
 
   Path<Nodal::Model> m_path;
