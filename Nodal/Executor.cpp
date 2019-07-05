@@ -26,31 +26,61 @@ struct node_graph_process final : public ossia::time_process
       ossia::time_value from, ossia::time_value to, double relative_position,
       ossia::time_value tick_offset, double speed) override
   {
-    const ossia::token_request tk{from, to, relative_position, tick_offset,
-                                  speed};
-    for (auto& node : nodes)
+    for (auto& process : processes)
     {
-      node->request(tk);
+      process->state(from, to, relative_position, tick_offset, speed);
     }
     m_lastDate = to;
   }
 
-  void add_node(std::shared_ptr<ossia::graph_node> n)
+  void add_process(std::shared_ptr<ossia::time_process> p, std::shared_ptr<ossia::graph_node>&& n)
   {
-    // n->set_prev_date(this->m_lastDate);
     nodes.insert(std::move(n));
+    processes.insert(std::move(p));
+  }
+
+  void start() override
+  {
+    for (auto& process : processes)
+    {
+      process->start();
+    }
   }
 
   void stop() override
   {
+    for (auto& process : processes)
+    {
+      process->stop();
+    }
     for (auto& node : nodes)
     {
       node->all_notes_off();
     }
   }
 
+  void pause() override
+  {
+    for (auto& process : processes)
+    {
+      process->pause();
+    }
+  }
+
+  void resume() override
+  {
+    for (auto& process : processes)
+    {
+      process->resume();
+    }
+  }
+
   void offset(time_value date, double pos) override
   {
+    for (auto& process : processes)
+    {
+      process->offset(date, pos);
+    }
     for (auto& node : nodes)
     {
       node->all_notes_off();
@@ -59,6 +89,10 @@ struct node_graph_process final : public ossia::time_process
 
   void transport(ossia::time_value date, double pos) override
   {
+    for (auto& process : processes)
+    {
+      process->transport(date, pos);
+    }
     for (auto& node : nodes)
     {
       node->all_notes_off();
@@ -71,7 +105,9 @@ struct node_graph_process final : public ossia::time_process
       node->set_mute(b);
   }
   ossia::flat_set<std::shared_ptr<ossia::graph_node>> nodes;
+  ossia::flat_set<std::shared_ptr<ossia::time_process>> processes;
   ossia::time_value m_lastDate{ossia::Infinite};
+
 };
 }
 namespace Nodal
@@ -99,9 +135,11 @@ ProcessExecutorComponent::ProcessExecutorComponent(
       if(comp)
       {
         reg(m_nodes[node.id()] = {comp}, commands);
-        if(auto n = comp->node)
+        auto child_n = comp->node;
+        auto child_p = comp->OSSIAProcessPtr();
+        if(child_n && child_p)
         {
-          p->add_node(n);
+          p->add_process(std::move(child_p), std::move(child_n));
         }
       }
     }
@@ -111,6 +149,11 @@ ProcessExecutorComponent::ProcessExecutorComponent(
     for (auto& cmd : f)
       cmd();
   });
+}
+
+ProcessExecutorComponent::~ProcessExecutorComponent()
+{
+
 }
 
 void ProcessExecutorComponent::unreg(

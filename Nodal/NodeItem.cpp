@@ -179,10 +179,11 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
     {
       m_fx = fx;
       m_presenter = factory->makeLayerPresenter(model.process(), fx, ctx.context, this);
-      m_presenter->setWidth(300., 300.);
-      m_presenter->setHeight(100.);
-      m_size = {300., 100.};
+      m_size = m_model.size();
+      m_presenter->setWidth(m_size.width(), m_size.width());
+      m_presenter->setHeight(m_size.height());
       m_presenter->on_zoomRatioChanged(1.);
+      m_presenter->parentGeometryChanged();
     }
   }
 
@@ -228,7 +229,8 @@ void NodeItem::setSize(QSizeF sz)
 
     m_presenter->setWidth(sz.width(), sz.width());
     m_presenter->setHeight(sz.height());
-    m_presenter->on_zoomRatioChanged(m_ratio / width());
+    m_presenter->on_zoomRatioChanged(m_ratio / sz.width());
+    m_presenter->parentGeometryChanged();
 
     resetInlets(m_model.process());
     resetOutlets(m_model.process());
@@ -250,7 +252,9 @@ void NodeItem::setZoomRatio(ZoomRatio r)
   if(m_presenter)
   {
     m_ratio = r;
-    m_presenter->on_zoomRatioChanged(m_ratio / width());
+    m_presenter->on_zoomRatioChanged(m_ratio / m_size.width());
+    // TODO investigate why this is necessary for scenario:
+    m_presenter->parentGeometryChanged();
   }
 }
 
