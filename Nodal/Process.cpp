@@ -3,6 +3,11 @@
 #include <wobjectimpl.h>
 
 #include <Process/ProcessList.hpp>
+#include <Nodal/Commands.hpp>
+#include <score/tools/std/Invoke.hpp>
+
+#include <score/document/DocumentContext.hpp>
+#include <score/command/Dispatchers/CommandDispatcher.hpp>
 
 W_OBJECT_IMPL(Nodal::Node)
 W_OBJECT_IMPL(Nodal::Model)
@@ -91,7 +96,44 @@ void Model::setDurationAndShrink(const TimeVal& newDuration) noexcept
   for(Node& n : this->nodes)
     n.process().setParentDuration(ExpandMode::GrowShrink, newDuration);
 }
+
+void Model::startExecution()
+{
 }
+
+void Model::stopExecution()
+{
+  resetExecution();
+}
+
+void Model::reset()
+{
+  resetExecution();
+}
+
+bool NodeRemover::remove(const Selection& s, const score::DocumentContext& ctx)
+{
+  if (s.size() == 1)
+  {
+    auto first = s.begin()->data();
+    if (auto model = qobject_cast<const Nodal::Node*>(first))
+    {
+      if (auto parent = qobject_cast<Model*>(model->parent()))
+      {
+        auto f = [&ctx, parent, model] {
+          CommandDispatcher<>{ctx.commandStack}.submit<RemoveNode>(
+                *parent, *model );
+        };
+        score::invoke(f);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+}
+
 template <>
 void DataStreamReader::read(const Nodal::Node& proc)
 {

@@ -33,12 +33,18 @@ struct node_graph_process final : public ossia::time_process
     m_lastDate = to;
   }
 
-  void add_process(std::shared_ptr<ossia::time_process> p, std::shared_ptr<ossia::graph_node>&& n)
+  void add_process(std::shared_ptr<ossia::time_process>&& p, std::shared_ptr<ossia::graph_node>&& n)
   {
     nodes.insert(std::move(n));
     processes.insert(std::move(p));
   }
 
+
+  void remove_process(const std::shared_ptr<ossia::time_process>& p, const std::shared_ptr<ossia::graph_node>& n)
+  {
+    nodes.erase(n);
+    processes.erase(p);
+  }
   void start() override
   {
     for (auto& process : processes)
@@ -114,61 +120,116 @@ namespace Nodal
 {
 
 
-ProcessExecutorComponent::ProcessExecutorComponent(
+NodalExecutorBase::NodalExecutorBase(
     Nodal::Model& element, const Execution::Context& ctx,
     const Id<score::Component>& id, QObject* parent)
     : ProcessComponent_T{element, ctx, id, "NodalExecutorComponent", parent}
 {
   // TODO load node
-  auto p = std::make_shared<ossia::node_graph_process>();
-  m_ossia_process = p;
-
-  std::vector<Execution::ExecutionCommand> commands;
-  auto& fact = ctx.doc.app.interfaces<Execution::ProcessComponentFactoryList>();
-
-  for(Node& node : element.nodes)
-  {
-    auto& proc = node.process();
-    if(Execution::ProcessComponentFactory* f = fact.factory(proc))
-    {
-      auto comp = f->make(proc, ctx, Id<score::Component>{proc.id_val()}, this);
-      if(comp)
-      {
-        reg(m_nodes[node.id()] = {comp}, commands);
-        auto child_n = comp->node;
-        auto child_p = comp->OSSIAProcessPtr();
-        if(child_n && child_p)
-        {
-          p->add_process(std::move(child_p), std::move(child_n));
-        }
-      }
-    }
-  }
-
-  in_exec([f = std::move(commands)] {
-    for (auto& cmd : f)
-      cmd();
-  });
+  m_ossia_process = std::make_shared<ossia::node_graph_process>();
 }
 
-ProcessExecutorComponent::~ProcessExecutorComponent()
+NodalExecutorBase::~NodalExecutorBase()
 {
 
 }
 
-void ProcessExecutorComponent::unreg(
+void NodalExecutorBase::unreg(
     const RegisteredNode& fx)
 {
   system().setup.unregister_node_soft(
       fx.comp->process().inlets(), fx.comp->process().outlets(), fx.comp->node);
 }
 
-void ProcessExecutorComponent::reg(
+void NodalExecutorBase::reg(
     const RegisteredNode& fx,
     std::vector<Execution::ExecutionCommand>& vec)
 {
   system().setup.register_node(
               fx.comp->process().inlets(), fx.comp->process().outlets(), fx.comp->node, vec);
+}
+
+
+Execution::ProcessComponent* NodalExecutorBase::make(
+    const Id<score::Component>& id,
+    Execution::ProcessComponentFactory& factory,
+    Nodal::Node& node)
+{
+  std::vector<Execution::ExecutionCommand> commands;
+  auto& proc = node.process();
+  auto comp = factory.make(proc, this->system(), id, this);
+  if (comp)
+  {
+    reg(m_nodes[node.id()] = {comp}, commands);
+    auto child_n = comp->node;
+    auto child_p = comp->OSSIAProcessPtr();
+    if(child_n && child_p)
+    {
+      auto p = std::dynamic_pointer_cast<ossia::node_graph_process>(m_ossia_process);
+      commands.push_back([child_n=std::move(child_n), child_p=std::move(child_p), p=std::move(p)] () mutable
+      {
+        p->add_process(std::move(child_p), std::move(child_n));
+      });
+    }
+
+    // TODO memory should be brought back in the main thread to be freed
+    in_exec([f = std::move(commands)] {
+      for (auto& cmd : f)
+        cmd();
+    });
+  }
+
+  return comp.get();
+}
+
+void NodalExecutorBase::added(::Execution::ProcessComponent& e)
+{
+
+}
+
+std::function<void()> NodalExecutorBase::removing(
+    const Nodal::Node& e,
+    ::Execution::ProcessComponent& c)
+{
+  std::vector<Execution::ExecutionCommand> commands;
+
+  auto it = ossia::find_if(
+      m_nodes, [&](const auto& v) { return v.first == e.id(); });
+  if (it == m_nodes.end())
+    return {};
+
+  auto& this_fx = it->second;
+
+  unreg(this_fx);
+
+  auto p = std::dynamic_pointer_cast<ossia::node_graph_process>(m_ossia_process);
+  auto child_p = c.OSSIAProcessPtr();
+  auto child_n = c.node;
+  commands.push_back(
+     [child_n=std::move(child_n), child_p=std::move(child_p), p=std::move(p)]
+  {
+    p->remove_process(child_p, child_n);
+  });
+
+  // TODO add a "exec all commands macro
+  in_exec([f = std::move(commands)] {
+    for (auto& cmd : f)
+      cmd();
+  });
+
+  c.node.reset();
+  return {};
+}
+
+void NodalExecutor::cleanup()
+{
+  clear();
+  ProcessComponent::cleanup();
+}
+
+NodalExecutor::~NodalExecutor()
+{
+
 }
 
 }

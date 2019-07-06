@@ -74,28 +74,40 @@ Presenter::Presenter(
   });
 
 
-  m_con = con(ctx.execTimer, &QTimer::timeout,
-              this, [&] {
-    auto parentObj = m_model.parent();
-    while(parentObj && !qobject_cast<Scenario::IntervalModel*>(parentObj)){
-      parentObj = parentObj->parent();
-    }
+  auto parentObj = m_model.parent();
+  while(parentObj && !qobject_cast<Scenario::IntervalModel*>(parentObj)){
+    parentObj = parentObj->parent();
+  }
 
-    if(parentObj)
-    {
-      auto itv = static_cast<Scenario::IntervalModel*>(parentObj);
-      float p = ossia::clamp((float)itv->duration.playPercentage(), 0.f, 1.f);
-      for(auto& node : m_nodes)
+  if(parentObj)
+  {
+    auto& dur = static_cast<Scenario::IntervalModel*>(parentObj)->duration;
+    m_con = con(ctx.execTimer, &QTimer::timeout,
+                this, [&] {
       {
-        node.setPlayPercentage(p);
+        float p = ossia::clamp((float)dur.playPercentage(), 0.f, 1.f);
+        for (NodeItem& node : m_nodes)
+        {
+          node.setPlayPercentage(p);
+        }
       }
+    });
+  }
+
+  connect(&m_model, &Model::resetExecution,
+          this, [this] {
+    for (NodeItem& node : m_nodes)
+    {
+      node.setPlayPercentage(0.f);
     }
   });
 }
+
 Presenter::~Presenter()
 {
   m_nodes.remove_all();
 }
+
 void Presenter::setWidth(qreal val, qreal defaultWidth)
 {
   m_view->setWidth(val);

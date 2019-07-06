@@ -16,7 +16,6 @@
 #include <Nodal/Process.hpp>
 #include <score/selection/SelectionDispatcher.hpp>
 #include <score/graphics/TextItem.hpp>
-#include <score/tools/std/Invoke.hpp>
 #include <QKeyEvent>
 #include <wobjectimpl.h>
 #include <score/command/Dispatchers/CommandDispatcher.hpp>
@@ -416,27 +415,3 @@ void NodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 }
 W_OBJECT_IMPL(Nodal::TitleItem)
 
-
-void Nodal::NodeItem::keyPressEvent(QKeyEvent* event)
-{
-  switch(event->key())
-  {
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace:
-    {
-      auto f = [this] {
-        auto parent = static_cast<Nodal::Model*>(m_model.parent());
-        CommandDispatcher<>{m_context.context.commandStack}.submit<RemoveNode>(
-              *parent, m_model );
-      };
-      score::invoke(f);
-      break;
-    }
-  }
-  event->accept();
-}
-
-void Nodal::NodeItem::keyReleaseEvent(QKeyEvent* event)
-{
-
-}

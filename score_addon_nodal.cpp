@@ -28,7 +28,8 @@ score_addon_nodal::factories(
       FW<Process::LayerFactory, Nodal::LayerFactory>,
       FW<Process::InspectorWidgetDelegateFactory, Nodal::InspectorFactory>,
       FW<Execution::ProcessComponentFactory,
-         Nodal::ProcessExecutorComponentFactory>
+         Nodal::ProcessExecutorComponentFactory>,
+      FW<score::ObjectRemover, Nodal::NodeRemover>
       //, FW<LocalTree::ProcessComponentFactory,
       //   Nodal::LocalTreeProcessComponentFactory>
       >(ctx, key);

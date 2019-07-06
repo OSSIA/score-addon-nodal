@@ -2,6 +2,7 @@
 #include <Process/GenericProcessFactory.hpp>
 #include <Process/Dataflow/Port.hpp>
 #include <Process/Process.hpp>
+#include <score/model/ObjectRemover.hpp>
 
 #include <Nodal/Metadata.hpp>
 
@@ -91,15 +92,29 @@ public:
   ~Model() override;
 
   score::EntityMap<Node> nodes;
+
+  void resetExecution()
+  W_SIGNAL(resetExecution)
+
 private:
   QString prettyName() const noexcept override;
 
   void setDurationAndScale(const TimeVal& newDuration) noexcept override;
   void setDurationAndGrow(const TimeVal& newDuration) noexcept override;
   void setDurationAndShrink(const TimeVal& newDuration) noexcept override;
+
+  void startExecution() override;
+  void stopExecution() override;
+  void reset() override;
 };
 
 using ProcessFactory = Process::ProcessFactory_T<Nodal::Model>;
+
+class NodeRemover : public score::ObjectRemover
+{
+  SCORE_CONCRETE("5e1c7e92-5beb-4313-92c8-f690089ff340")
+  bool remove(const Selection& s, const score::DocumentContext& ctx) override;
+};
 }
 
 W_REGISTER_ARGTYPE(Process::ProcessModel*)
