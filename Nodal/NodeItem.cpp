@@ -36,8 +36,8 @@ public:
   : QObject{parent}
   , QGraphicsItem{&item}
   , m_effect{effect}
-  , m_width{140}
   , m_item{item}
+  , m_width{140}
   {
     setFlag(ItemClipsChildrenToShape, true);
 
@@ -47,7 +47,7 @@ public:
         = Process::makeExternalUIButton(effect, ctx, this, this))
       ui_btn->setPos({5, 0});
 
-    auto label = new score::SimpleTextItem{skin.IntervalBase, this};
+    auto label = new score::SimpleTextItem{&skin.skin.Base1, this};
     label->setText(effect.prettyShortName());
     label->setFont(skin.skin.Medium10Pt);
     label->setPos({30, 0});
@@ -69,12 +69,12 @@ public:
 
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setPen(pen);
-    painter->setBrush(m_hover ? QBrush(style.RectPen.color().lighter(110)) : style.RectPen.brush());
+    painter->setBrush(m_hover ? style.skin.Background2.lighter.brush : style.skin.Background2.main.brush); //  style.RectPen().color().lighter(110)
     painter->drawRoundedRect(boundingRect(), 2, 2);
     painter->setRenderHint(QPainter::Antialiasing, false);
     if(m_playPercentage != 0.)
     {
-      painter->setPen(style.IntervalPlayPen);
+      painter->setPen(style.IntervalSolidPen(style.IntervalPlayFill()));
       painter->drawLine(QPointF{0.f, 14.f}, QPointF{m_width * m_playPercentage, 14.});
     }
   }
@@ -289,27 +289,22 @@ void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, 
 {
   auto& style = Process::Style::instance();
 
-  QPen basePen = style.RectPen;
-  if(m_selected)
-    basePen.setColor(basePen.color().lighter(150));
-  else if(m_hover)
-    basePen.setColor(basePen.color().lighter(110));
+  const auto& brush = m_selected ? style.skin.Background2.lighter180
+                                 : m_hover ? style.skin.Background2.lighter
+                                           : style.skin.Background2.main;
 
+  painter->setPen(brush.pen2_solid_round_round);
+  painter->setBrush(style.RectBrush());
 
   auto rect = boundingRect();
-
-  painter->setPen(basePen);
-  painter->setBrush(style.RectBrush);
   painter->drawRoundedRect(rect, 2., 2.);
 
-  QBrush fillBrush = basePen.color();
-  painter->setBrush(fillBrush);
+  painter->setBrush(brush.brush);
   painter->drawRoundedRect(QRectF{0., rect.height() - 10., rect.width(), 10.}, 2., 2.);
 
   if(m_presenter)
   {
-    QBrush b = basePen.brush();
-    b.setColor(b.color().darker());
+    QBrush b = style.skin.Emphasis1.darker.brush; // TODO erk
     b.setStyle(Qt::BrushStyle::BDiagPattern);
     painter->fillRect(QRectF{
                         rect.width() - 10.,
