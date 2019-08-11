@@ -17,97 +17,18 @@
 #include <score/selection/SelectionDispatcher.hpp>
 #include <score/graphics/TextItem.hpp>
 #include <QKeyEvent>
+#include <Effect/EffectPainting.hpp>
 #include <wobjectimpl.h>
 #include <score/command/Dispatchers/CommandDispatcher.hpp>
 namespace Nodal
 {
-
-class TitleItem final
-    : public QObject
-    , public QGraphicsItem
-{
-  W_OBJECT(TitleItem)
-public:
-  TitleItem(
-      Process::ProcessModel& effect,
-      const score::DocumentContext& ctx,
-      NodeItem& item,
-      QObject* parent)
-  : QObject{parent}
-  , QGraphicsItem{&item}
-  , m_effect{effect}
-  , m_item{item}
-  , m_width{140}
-  {
-    setFlag(ItemClipsChildrenToShape, true);
-
-    const auto& skin = Process::Style::instance();
-
-    if (auto ui_btn
-        = Process::makeExternalUIButton(effect, ctx, this, this))
-      ui_btn->setPos({5, 0});
-
-    auto label = new score::SimpleTextItem{&skin.skin.Base1, this};
-    label->setText(effect.prettyShortName());
-    label->setFont(skin.skin.Medium10Pt);
-    label->setPos({30, 0});
-  }
-
-  void setPlayPercentage(float f)
-  {
-    m_playPercentage = f;
-    update();
-  }
-  QRectF boundingRect() const override { return {0, 0, m_width, 15}; }
-  void paint(
-      QPainter* painter,
-      const QStyleOptionGraphicsItem* option,
-      QWidget* widget) override
-  {
-    static const auto pen = QPen{Qt::transparent};
-    auto& style = Process::Style::instance();
-
-    painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(pen);
-    painter->setBrush(m_hover ? style.skin.Background2.lighter.brush : style.skin.Background2.main.brush); //  style.RectPen().color().lighter(110)
-    painter->drawRoundedRect(boundingRect(), 2, 2);
-    painter->setRenderHint(QPainter::Antialiasing, false);
-    if(m_playPercentage != 0.)
-    {
-      painter->setPen(style.IntervalSolidPen(style.IntervalPlayFill()));
-      painter->drawLine(QPointF{0.f, 14.f}, QPointF{m_width * m_playPercentage, 14.});
-    }
-  }
-
-  void setWidth(qreal w) {
-    prepareGeometryChange();
-    m_width = w;
-  }
-  void setHighlight(bool b) {}
-  void clicked() W_SIGNAL(clicked)
-
-
-  void setHover(bool b)
-  {
-    m_hover = b;
-    update();
-  }
-
-private:
-  const Process::ProcessModel& m_effect;
-  NodeItem& m_item;
-  qreal m_width{};
-  float m_playPercentage{};
-  bool m_hover{};
-};
-
 
 void NodeItem::resetInlets(
     Process::ProcessModel& effect)
 {
   qDeleteAll(m_inlets);
   m_inlets.clear();
-  qreal x = 10;
+  qreal x = InletX0;
   auto& portFactory
       = score::GUIAppContext().interfaces<Process::PortFactoryList>();
   for (Process::Inlet* port : effect.inlets())
@@ -116,11 +37,13 @@ void NodeItem::resetInlets(
       continue;
     Process::PortFactory* fact = portFactory.get(port->concreteKey());
     Dataflow::PortItem* item = fact->makeItem(*port, m_context.context, this, this);
-    item->setPos(x, -1.5);
+    item->setPos(x, InletY0);
     m_inlets.push_back(item);
 
-    x += 10.;
+    x += PortSpacing;
   }
+
+  m_label->setPos(QPointF{x + 2., 0.});
 }
 
 void NodeItem::resetOutlets(
@@ -128,7 +51,8 @@ void NodeItem::resetOutlets(
 {
   qDeleteAll(m_outlets);
   m_outlets.clear();
-  qreal x = 10;
+  qreal x = OutletX0;
+  const qreal h = boundingRect().height() + OutletY0;
   auto& portFactory
       = score::AppContext().interfaces<Process::PortFactoryList>();
   for (Process::Outlet* port : effect.outlets())
@@ -137,26 +61,18 @@ void NodeItem::resetOutlets(
       continue;
     Process::PortFactory* fact = portFactory.get(port->concreteKey());
     auto item = fact->makeItem(*port, m_context.context, this, this);
-    item->setPos(x, boundingRect().height() - 5.);
+    item->setPos(x, h);
     m_outlets.push_back(item);
 
-    x += 10.;
+    x += PortSpacing;
   }
 }
 
 NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphicsItem* parent)
-  : QGraphicsItem{parent}
+  : ItemBase{model.process(), ctx.context, parent}
   , m_model{model}
   , m_context{ctx}
 {
-  setAcceptedMouseButtons(Qt::LeftButton);
-  setAcceptHoverEvents(true);
-  setFlag(ItemIsFocusable, true);
-
-  // Title
-  m_title = new TitleItem{model.process(), ctx.context, *this, this};
-  m_title->setParentItem(this);
-
   // Body
   auto& fact = ctx.context.app.interfaces<Process::LayerFactoryList>();
   if (auto factory = fact.findDefaultFactory(model.process()))
@@ -169,7 +85,6 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
                 this, [this] {
            prepareGeometryChange();
            const auto r = m_fx->boundingRect();
-           m_title->setWidth(r.width());
            m_size = r.size();
            update();
         });
@@ -195,9 +110,13 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
   resetInlets(model.process());
   resetOutlets(model.process());
 
+  if(m_ui)
+  {
+    m_ui->setPos({m_size.width() + TopButtonX0, TopButtonY0});
+  }
+
   // Positions / size
-  m_fx->setPos({0, m_title->boundingRect().height()});
-  m_title->setWidth(m_size.width());
+  m_fx->setPos({0, Effect::ItemBase::TitleHeight});
 
   ::bind(model, Node::p_position{}, this, [this] (QPointF p) {
       if(p != pos())
@@ -208,12 +127,6 @@ NodeItem::NodeItem(const Node& model, const Process::LayerContext& ctx, QGraphic
     if(s != m_size)
       setSize(s);
   });
-
-  // Selection
-  con(m_model.process().selection,
-      &Selectable::changed,
-      this,
-      &NodeItem::setSelected);
 }
 
 void NodeItem::setSize(QSizeF sz)
@@ -224,7 +137,6 @@ void NodeItem::setSize(QSizeF sz)
     //      - maybe set it without a command in that case ?
     prepareGeometryChange();
     m_size = sz;
-    m_title->setWidth(sz.width());
 
     m_presenter->setWidth(sz.width(), sz.width());
     m_presenter->setHeight(sz.height());
@@ -233,6 +145,10 @@ void NodeItem::setSize(QSizeF sz)
 
     resetInlets(m_model.process());
     resetOutlets(m_model.process());
+    if(m_ui)
+    {
+      m_ui->setPos({m_size.width() + TopButtonX0, TopButtonY0});
+    }
   }
 }
 
@@ -250,34 +166,20 @@ void NodeItem::setZoomRatio(ZoomRatio r)
 {
   if(m_presenter)
   {
-    m_ratio = r;
-    m_presenter->on_zoomRatioChanged(m_ratio / m_size.width());
-    // TODO investigate why this is necessary for scenario:
-    m_presenter->parentGeometryChanged();
+    if(r != m_ratio)
+    {
+      m_ratio = r;
+      m_presenter->on_zoomRatioChanged(m_ratio / m_size.width());
+      // TODO investigate why this is necessary for scenario:
+      m_presenter->parentGeometryChanged();
+    }
   }
 }
 
 void NodeItem::setPlayPercentage(float f)
 {
-  m_title->setPlayPercentage(f);
-}
-
-void NodeItem::setSelected(bool s)
-{
-  if(m_selected != s)
-  {
-    m_selected = s;
-    if(s)
-      setFocus();
-
-    update();
-  }
-}
-
-QRectF NodeItem::boundingRect() const
-{
-  const auto tsz = m_title->boundingRect();
-  return {0, 0, m_size.width(), tsz.height() + m_size.height() + 10.};
+  m_playPercentage = f;
+  update();
 }
 
 bool NodeItem::isInSelectionCorner(QPointF p, QRectF r) const
@@ -287,24 +189,14 @@ bool NodeItem::isInSelectionCorner(QPointF p, QRectF r) const
 
 void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
-  auto& style = Process::Style::instance();
+  const auto rect = boundingRect();
 
-  const auto& brush = m_selected ? style.skin.Background2.lighter180
-                                 : m_hover ? style.skin.Background2.lighter
-                                           : style.skin.Background2.main;
-
-  painter->setPen(brush.pen2_solid_round_round);
-  painter->setBrush(style.RectBrush());
-
-  auto rect = boundingRect();
-  painter->drawRoundedRect(rect, 2., 2.);
-
-  painter->setBrush(brush.brush);
-  painter->drawRoundedRect(QRectF{0., rect.height() - 10., rect.width(), 10.}, 2., 2.);
+  ItemBase::paintNode(painter, m_selected, m_hover, rect);
 
   if(m_presenter)
   {
-    QBrush b = style.skin.Emphasis1.darker.brush; // TODO erk
+    auto& style = Process::Style::instance();
+    static QBrush b = style.skin.Emphasis1.darker.brush; // TODO erk
     b.setStyle(Qt::BrushStyle::BDiagPattern);
     painter->fillRect(QRectF{
                         rect.width() - 10.,
@@ -312,6 +204,14 @@ void NodeItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, 
                         10., 10.
                       },
                       b);
+  }
+
+  // Exec
+  if(m_playPercentage != 0.)
+  {
+    auto& style = Process::Style::instance();
+    painter->setPen(style.IntervalSolidPen(style.IntervalPlayFill()));
+    painter->drawLine(QPointF{0.f, 14.f}, QPointF{rect.width() * m_playPercentage, 14.});
   }
 }
 
@@ -380,10 +280,7 @@ void NodeItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
     unsetCursor();
   }
 
-  m_hover = true;
-  m_title->setHover(true);
-  update();
-  event->accept();
+  ItemBase::hoverEnterEvent(event);
 }
 
 void NodeItem::hoverMoveEvent(QGraphicsSceneHoverEvent *event)
@@ -396,17 +293,12 @@ void NodeItem::hoverMoveEvent(QGraphicsSceneHoverEvent *event)
   {
     unsetCursor();
   }
-
+  ItemBase::hoverMoveEvent(event);
 }
 
 void NodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 {
   unsetCursor();
-  m_hover = false;
-  m_title->setHover(false);
-  update();
-  event->accept();
+  ItemBase::hoverLeaveEvent(event);
 }
 }
-W_OBJECT_IMPL(Nodal::TitleItem)
-
