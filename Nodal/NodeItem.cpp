@@ -4,7 +4,6 @@
 #include <Process/ProcessFactory.hpp>
 #include <Process/ProcessList.hpp>
 #include <score/application/GUIApplicationContext.hpp>
-#include <QPainter>
 #include <QGraphicsSceneMouseEvent>
 #include <Control/DefaultEffectItem.hpp>
 #include <score/document/DocumentContext.hpp>
@@ -16,10 +15,14 @@
 #include <Nodal/Process.hpp>
 #include <score/selection/SelectionDispatcher.hpp>
 #include <score/graphics/TextItem.hpp>
-#include <QKeyEvent>
 #include <Effect/EffectPainting.hpp>
 #include <wobjectimpl.h>
+#include <score/tools/Bind.hpp>
 #include <score/command/Dispatchers/CommandDispatcher.hpp>
+#include <QPainter>
+#include <QKeyEvent>
+#include <QCursor>
+
 namespace Nodal
 {
 
